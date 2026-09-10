@@ -1,30 +1,11 @@
-/*
- * build.c -- the compiler host for the Instafn userscript build.
- *
- * Shape borrowed from two places, per request: avroc.c (Avroscript) for the
- * MuJS glue -- readFile/writeFile/exists/log, nothing more, because that's
- * all a build script running under an embeddable ES5 interpreter needs --
- * and bundlejs's build.c/build.h split for the plain-C side (userscript
- * metadata block, file collection). Neither is copied verbatim: bundlejs
- * has no MuJS in it at all (it's pure string concatenation, fine for a
- * single-namespace project like Avro's), but instafn's vendored source is
- * real multi-file ESM with actual import/export wiring to resolve, which is
- * exactly the "too complex for a C string function" case avroc.c's own
- * comment calls out. So: C does directory walking + the userscript header
- * (things C is genuinely good at), MuJS runs transform.js to do the
- * import/export rewrite (the thing you want a real language for), and this
- * file is just the ~150 lines of glue connecting the two.
- *
- * Usage: build [transform-script]   (defaults to tools/transform.js)
- */
-
 #include "build.h"
 #include <mujs.h>
 
-/* ---- MuJS host functions, exposed to transform.js ----------------------
- * Identical contract to avroc.c: readFile(path), writeFile(path,data),
- * exists(path), log(...). transform.js never touches the filesystem any
- * other way. */
+#define NAME        "Instafn"
+#define NAMESPACE   "https://github.com/xafn/instafn"
+#define VERSION     "4.0.0"
+#define DESCRIPTION "Instagram privacy/productivity mods (userscript port of the Instafn extension)"
+#define AUTHOR      "afn (original extension); userscript port via HimadriChakra12"
 
 static void jsb_readFile(js_State *J) {
     const char *path = js_tostring(J, 1);
@@ -84,14 +65,6 @@ static void run_transform(const char *script_path) {
     }
     js_freestate(J);
 }
-
-/* ---- userscript metadata (this project's own values) -------------------- */
-
-#define NAME        "Instafn"
-#define NAMESPACE   "https://github.com/xafn/instafn"
-#define VERSION     "3.0.0"
-#define DESCRIPTION "Instagram privacy/productivity mods (userscript port of the Instafn extension)"
-#define AUTHOR      "afn (original extension); userscript port via HimadriChakra12"
 
 LISTOF(MATCH,
     "*://www.instagram.com/*"

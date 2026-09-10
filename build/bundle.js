@@ -14186,15 +14186,30 @@ function extractFollowStatus(data) {
 }
 
 function setupGraphQLMessageListener() {
+  // Bare `window` here is NOT reliably the real page window: this is a
+  // regular (non-toPageScript) module in the userscript bundle, and in a
+  // Tampermonkey/Violentmonkey sandbox -- Firefox especially -- bare
+  // `window` is a sandbox wrapper distinct from the real page window.
+  // graphql-sniffer.js (the sender) IS toPageScript-wrapped and posts via
+  // the real page window, so both listening on bare `window` and checking
+  // `event.source === window` failed here: the listener was attached to a
+  // different window object than the one the message was posted to (never
+  // even firing), and the source check would have failed anyway even if it
+  // had. Follow-status responses were silently dropped every time, and
+  // this always fell through to the 3s "FAILED TO FETCH" timeout.
+  // __realWindow is declared once in shim/02-page-inject.js and is in
+  // scope here since this module is concatenated into that same bundle.
+  const realWindow = typeof __realWindow !== "undefined" ? __realWindow : window;
+
   // Remove existing listener if any
   if (messageListenerHandler) {
-    window.removeEventListener("message", messageListenerHandler);
+    realWindow.removeEventListener("message", messageListenerHandler);
   }
 
   messageListenerHandler = (event) => {
     if (!isEnabled) return;
     if (
-      event.source === window &&
+      event.source === realWindow &&
       event.data?.source === "instafn-graphql" &&
       event.data.type === "graphql-response" &&
       event.data.isProfileRequest
@@ -14232,7 +14247,7 @@ function setupGraphQLMessageListener() {
     }
   };
 
-  window.addEventListener("message", messageListenerHandler);
+  realWindow.addEventListener("message", messageListenerHandler);
 }
 
 function injectFollowIndicator() {
@@ -14395,7 +14410,6 @@ function initProfileFollowIndicator() {
     subtree: true,
   });
 }
-
 
 
 module.exports.setupGraphQLMessageListenerEarly = setupGraphQLMessageListenerEarly;
