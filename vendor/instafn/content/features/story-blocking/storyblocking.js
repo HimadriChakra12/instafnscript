@@ -227,7 +227,19 @@
 
   // Intercept XHR open to capture URL and method
   const originalXHROpen = XMLHttpRequest.prototype.open;
+  const originalWindowOpen = window.open;
   XMLHttpRequest.prototype.open = function(method, url) {
+    // Same fix applied to voice-sniffer.js and graphql-sniffer.js:
+    // Instagram's call-launch flow invokes a reference it holds named
+    // "open" with `this` bound to the real window (i.e. window.open(url,
+    // ...), nothing to do with XHR). Since every "open" on
+    // XMLHttpRequest.prototype is patched here too, that call would
+    // otherwise be handed to the native XHR open() and throw "Illegal
+    // invocation" (a Window is not a valid XHR receiver), aborting the
+    // call. Delegate to the real window.open for a non-XHR receiver.
+    if (!(this instanceof XMLHttpRequest)) {
+      return originalWindowOpen.apply(this, arguments);
+    }
     this._method = method;
     this._url = url;
     this._headers = {}; // Store headers for this request

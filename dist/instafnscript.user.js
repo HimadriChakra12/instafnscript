@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Instafn
 // @namespace   https://github.com/xafn/instafn
-// @version     4.0.0
+// @version     5.0.0
 // @description Instagram privacy/productivity mods (userscript port of the Instafn extension)
 // @author      afn (original extension); userscript port via HimadriChakra12
 // @match       *://www.instagram.com/*
@@ -2138,8 +2138,20 @@ var XMLHttpRequest = wrapCtorForPatching(window.XMLHttpRequest), WebSocket = wra
 
   const originalXHROpen = XMLHttpRequest.prototype.open;
   const originalXHRSend = XMLHttpRequest.prototype.send;
+  const originalWindowOpen = window.open;
 
   XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+    // Same fix as voice-sniffer.js: Instagram's own openURLWithFullPageReload
+    // (call-launch flow) invokes a reference it holds named "open" with
+    // `this` bound to the real window, meaning window.open(url, ...) --
+    // nothing to do with XHR. Since this patches every "open" on
+    // XMLHttpRequest.prototype, that call would otherwise route through
+    // here and get handed to the native XHR open(), throwing "Illegal
+    // invocation" (a Window is not a valid XHR receiver) and aborting the
+    // call. Delegate to the real window.open for a non-XHR receiver.
+    if (!(this instanceof XMLHttpRequest)) {
+      return originalWindowOpen.apply(this, arguments);
+    }
     this._instafnUrl = url;
     this._instafnMethod = method;
     return originalXHROpen.apply(this, [method, url, ...rest]);
@@ -2515,7 +2527,19 @@ var XMLHttpRequest = wrapCtorForPatching(window.XMLHttpRequest), WebSocket = wra
 
   // Intercept XHR open to capture URL and method
   const originalXHROpen = XMLHttpRequest.prototype.open;
+  const originalWindowOpen = window.open;
   XMLHttpRequest.prototype.open = function(method, url) {
+    // Same fix applied to voice-sniffer.js and graphql-sniffer.js:
+    // Instagram's call-launch flow invokes a reference it holds named
+    // "open" with `this` bound to the real window (i.e. window.open(url,
+    // ...), nothing to do with XHR). Since every "open" on
+    // XMLHttpRequest.prototype is patched here too, that call would
+    // otherwise be handed to the native XHR open() and throw "Illegal
+    // invocation" (a Window is not a valid XHR receiver), aborting the
+    // call. Delegate to the real window.open for a non-XHR receiver.
+    if (!(this instanceof XMLHttpRequest)) {
+      return originalWindowOpen.apply(this, arguments);
+    }
     this._method = method;
     this._url = url;
     this._headers = {}; // Store headers for this request
@@ -2739,8 +2763,22 @@ var XMLHttpRequest = wrapCtorForPatching(window.XMLHttpRequest), WebSocket = wra
   // XHR path — this is how the thread loads its messages.
   var originalOpen = XMLHttpRequest.prototype.open;
   var originalSend = XMLHttpRequest.prototype.send;
+  var originalWindowOpen = window.open;
 
   XMLHttpRequest.prototype.open = function (method, url) {
+    // Confirmed via a live breakpoint, not a guess: Instagram's own
+    // openURLWithFullPageReload (called from launchCall) invokes a
+    // reference it holds named "open" with `this` bound to the real
+    // `window` -- i.e. it means to call window.open(url, ...) to launch
+    // the call in a new tab, nothing to do with XHR at all. Because we
+    // patch every "open" on XMLHttpRequest.prototype, that call routed
+    // through here, and handing it to the native XHR open() threw
+    // "Illegal invocation" (a Window is not a valid XHR receiver) --
+    // which was aborting the call. Detect a non-XHR receiver and delegate
+    // to the real window.open instead.
+    if (!(this instanceof XMLHttpRequest)) {
+      return originalWindowOpen.apply(this, arguments);
+    }
     this.__instafnVoiceUrl = url;
     return originalOpen.apply(this, arguments);
   };

@@ -3,7 +3,7 @@
 
 #define NAME        "Instafn"
 #define NAMESPACE   "https://github.com/xafn/instafn"
-#define VERSION     "4.0.0"
+#define VERSION     "5.0.0"
 #define DESCRIPTION "Instagram privacy/productivity mods (userscript port of the Instafn extension)"
 #define AUTHOR      "afn (original extension); userscript port via HimadriChakra12"
 

@@ -112,8 +112,22 @@
   // XHR path — this is how the thread loads its messages.
   var originalOpen = XMLHttpRequest.prototype.open;
   var originalSend = XMLHttpRequest.prototype.send;
+  var originalWindowOpen = window.open;
 
   XMLHttpRequest.prototype.open = function (method, url) {
+    // Confirmed via a live breakpoint, not a guess: Instagram's own
+    // openURLWithFullPageReload (called from launchCall) invokes a
+    // reference it holds named "open" with `this` bound to the real
+    // `window` -- i.e. it means to call window.open(url, ...) to launch
+    // the call in a new tab, nothing to do with XHR at all. Because we
+    // patch every "open" on XMLHttpRequest.prototype, that call routed
+    // through here, and handing it to the native XHR open() threw
+    // "Illegal invocation" (a Window is not a valid XHR receiver) --
+    // which was aborting the call. Detect a non-XHR receiver and delegate
+    // to the real window.open instead.
+    if (!(this instanceof XMLHttpRequest)) {
+      return originalWindowOpen.apply(this, arguments);
+    }
     this.__instafnVoiceUrl = url;
     return originalOpen.apply(this, arguments);
   };

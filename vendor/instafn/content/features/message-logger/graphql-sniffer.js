@@ -134,8 +134,20 @@
 
   const originalXHROpen = XMLHttpRequest.prototype.open;
   const originalXHRSend = XMLHttpRequest.prototype.send;
+  const originalWindowOpen = window.open;
 
   XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+    // Same fix as voice-sniffer.js: Instagram's own openURLWithFullPageReload
+    // (call-launch flow) invokes a reference it holds named "open" with
+    // `this` bound to the real window, meaning window.open(url, ...) --
+    // nothing to do with XHR. Since this patches every "open" on
+    // XMLHttpRequest.prototype, that call would otherwise route through
+    // here and get handed to the native XHR open(), throwing "Illegal
+    // invocation" (a Window is not a valid XHR receiver) and aborting the
+    // call. Delegate to the real window.open for a non-XHR receiver.
+    if (!(this instanceof XMLHttpRequest)) {
+      return originalWindowOpen.apply(this, arguments);
+    }
     this._instafnUrl = url;
     this._instafnMethod = method;
     return originalXHROpen.apply(this, [method, url, ...rest]);
